@@ -1,6 +1,7 @@
 package main
 
 import (
+	"DeliciousService/cmd"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -32,7 +33,7 @@ func init() {
 	getDataCmd.MarkFlagRequired("token") // アクセストークンを必須にする
 
 	// データ表示関数にIDを設定するフラグを追加
-	getBreadsInfoCmd.Flags().IntP("id", "i", 0, "取得したいID (任意)　未入力の場合、すべての情報を表示")
+	getBreadsInfoCmd.Flags().StringP("id", "i", "", "取得したいID (任意)　未入力の場合、すべての情報を表示")
 
 	// データ取得関数とデータ表示関数をルートコマンドに追加
 	rootCmd.AddCommand(getDataCmd)
@@ -49,27 +50,15 @@ var getDataCmd = &cobra.Command{
 // graphQLを利用し、FireStore内の情報へアクセスする
 var getBreadsInfoCmd = &cobra.Command{
 	Use:   "getBreadsInfo",
-	Short: "コマンド2の説明",
-	Run: func(cmd *cobra.Command, args []string) {
+	Short: "graphQLを利用し、FireStore内の情報へアクセスします",
+	Run: func(inputCmd *cobra.Command, args []string) {
 		// コマンド2の処理を記述
-		id, _ := cmd.Flags().GetInt("id")
-		fmt.Printf("コマンド2が実行されました。ID: %d\n", id)
+		id, _ := inputCmd.Flags().GetString("id")
+		cmd.ExecuteBreadsInfoCmd(id)
 	},
 }
 
 func main() {
-	// // アクセストークンをコマンドライン引数として追加
-	// rootCmd.PersistentFlags().StringVarP(&accessToken, "token", "t", "", "Contentful Access Token")
-	// // 必須入力化
-	// rootCmd.MarkPersistentFlagRequired("token")
-
-	// // IDをコマンドライン引数として追加
-	// rootCmd.PersistentFlags().StringVarP(&id, "id", "t", "", "graphQLサーバからIDに紐づく情報を取得するため")
-
-	// // ContentfulAPIを利用し、FireStoreに格納する
-	// rootCmd.AddCommand(getDataCmd)
-	// // graphQLサーバの生成　および　結果の取得
-	// rootCmd.AddCommand(getBreadsInfoCmd)
 
 	// 処理を実行
 	if err := rootCmd.Execute(); err != nil {
@@ -83,12 +72,6 @@ var environmentIDs = []string{
 	"41RUO5w4oIpNuwaqHuSwEc",
 	"4Li6w5uVbJNVXYVxWjWVoZ",
 }
-
-// var getDataCmd = &cobra.Command{
-// 	Use:   "getData",
-// 	Short: "Contentful APIからデータを取得し、FireStoreへ格納します",
-// 	Run:   fetchDataAndStore,
-// }
 
 func fetchDataAndStore(cmd *cobra.Command, args []string) {
 	accessToken, _ := cmd.Flags().GetString("token")
