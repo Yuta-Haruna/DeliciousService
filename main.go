@@ -21,19 +21,13 @@ var BREADS_DOCUMENT_ID = "GyNVqdXn86W20lPCEJ0Y"
 var YOUR_PROJECT_ID = "samplefirebaseproject-c2ebb"
 var BREADS_COLLECTION = "Breads"
 
-type BreadInfo struct {
-	ID        string `json:"id"`
-	Name      string `json:"name"`
-	CreatedAt string `json:"createdAt"`
-}
-
 func init() {
 	// データ取得関数にアクセストークンを設定するフラグを追加
 	getDataCmd.Flags().StringP("token", "t", "", "アクセストークン (必須)")
 	getDataCmd.MarkFlagRequired("token") // アクセストークンを必須にする
 
 	// データ表示関数にIDを設定するフラグを追加
-	getBreadsInfoCmd.Flags().StringP("id", "i", "", "取得したいID (任意)　未入力の場合、すべての情報を表示")
+	// getBreadsInfoCmd.Flags().StringP("id", "i", "", "取得したいID (任意)　未入力の場合、すべての情報を表示")
 
 	// データ取得関数とデータ表示関数をルートコマンドに追加
 	rootCmd.AddCommand(getDataCmd)
@@ -52,9 +46,8 @@ var getBreadsInfoCmd = &cobra.Command{
 	Use:   "getBreadsInfo",
 	Short: "graphQLを利用し、FireStore内の情報へアクセスします",
 	Run: func(inputCmd *cobra.Command, args []string) {
-		// コマンド2の処理を記述
-		id, _ := inputCmd.Flags().GetString("id")
-		cmd.ExecuteBreadsInfoCmd(id)
+		// 実行
+		cmd.ExecuteBreadsInfoCmd()
 	},
 }
 
