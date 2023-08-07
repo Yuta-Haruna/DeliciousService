@@ -1,0 +1,12 @@
+# schema.graphql
+
+type BreadInfo {
+  id: ID!
+  name: String!
+  createdAt: String!
+}
+
+type Query {
+  item(id: ID!): BreadInfo
+  items: [BreadInfo!]!
+}

@@ -1,8 +1,7 @@
-// main.go
-
 package main
 
 import (
+	"DeliciousService/cmd"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -20,39 +19,61 @@ var rootCmd = &cobra.Command{Use: "deliciousService"}
 var accessToken string
 var BREADS_DOCUMENT_ID = "GyNVqdXn86W20lPCEJ0Y"
 var YOUR_PROJECT_ID = "samplefirebaseproject-c2ebb"
+var BREADS_COLLECTION = "Breads"
 
-func main() {
+func init() {
+	// データ取得関数にアクセストークンを設定するフラグを追加
+	getDataCmd.Flags().StringP("token", "t", "", "アクセストークン (必須)")
+	getDataCmd.MarkFlagRequired("token") // アクセストークンを必須にする
+
+	// データ表示関数にIDを設定するフラグを追加
+	// getBreadsInfoCmd.Flags().StringP("id", "i", "", "取得したいID (任意)　未入力の場合、すべての情報を表示")
+
+	// データ取得関数とデータ表示関数をルートコマンドに追加
 	rootCmd.AddCommand(getDataCmd)
-
-	// アクセストークンをコマンドライン引数として追加
-	rootCmd.PersistentFlags().StringVarP(&accessToken, "token", "t", "", "Contentful Access Token")
-	// 必須入力化
-	rootCmd.MarkPersistentFlagRequired("token")
-
-	if err := rootCmd.Execute(); err != nil {
-		fmt.Println(err)
-	}
+	rootCmd.AddCommand(getBreadsInfoCmd)
 }
 
-var spaceID = "2vskphwbz4oc"
-var environmentIDs = []string{
-	"6QRk7gQYmOyJ1eMG9H4jbB",
-	"41RUO5w4oIpNuwaqHuSwEc",
-	"4Li6w5uVbJNVXYVxWjWVoZ",
-}
-
+// contentful APIを利用し、FireBaseへ格納する
 var getDataCmd = &cobra.Command{
 	Use:   "getData",
 	Short: "Contentful APIからデータを取得し、FireStoreへ格納します",
 	Run:   fetchDataAndStore,
 }
 
+// graphQLを利用し、FireStore内の情報へアクセスする
+var getBreadsInfoCmd = &cobra.Command{
+	Use:   "getBreadsInfo",
+	Short: "graphQLを利用し、FireStore内の情報へアクセスします",
+	Run: func(inputCmd *cobra.Command, args []string) {
+		// 実行
+		cmd.ExecuteBreadsInfoCmd()
+	},
+}
+
+func main() {
+
+	// 処理を実行
+	if err := rootCmd.Execute(); err != nil {
+		fmt.Println(err)
+	}
+}
+
+var SPACE_ID = "2vskphwbz4oc"
+var environmentIDs = []string{
+	"6QRk7gQYmOyJ1eMG9H4jbB",
+	"41RUO5w4oIpNuwaqHuSwEc",
+	"4Li6w5uVbJNVXYVxWjWVoZ",
+}
+
 func fetchDataAndStore(cmd *cobra.Command, args []string) {
+	accessToken, _ := cmd.Flags().GetString("token")
+
 	var allData []map[string]interface{}
 
 	for _, envID := range environmentIDs {
 		// Contentful APIからデータを取得
-		data, err := getData(envID)
+		data, err := getData(accessToken, envID)
 		if err != nil {
 			log.Fatalf("Contentfulからデータを取得中にエラーが発生しました（environmentID: %s）: %v", envID, err)
 		}
@@ -77,10 +98,14 @@ func fetchDataAndStore(cmd *cobra.Command, args []string) {
 
 }
 
-func getData(environmentID string) ([]map[string]interface{}, error) {
+func getData(accessToken string, environmentID string) ([]map[string]interface{}, error) {
+	if SPACE_ID == "" || accessToken == "" {
+		return nil, fmt.Errorf("SPACE_ID または accessToken が設定されていません")
+	}
+
 	client := resty.New()
 
-	url := fmt.Sprintf("https://cdn.contentful.com/spaces/%s/entries/%s", spaceID, environmentID)
+	url := fmt.Sprintf("https://cdn.contentful.com/spaces/%s/entries/%s", SPACE_ID, environmentID)
 
 	resp, err := client.R().
 		SetHeader("Authorization", fmt.Sprintf("Bearer %s", accessToken)).
@@ -91,6 +116,10 @@ func getData(environmentID string) ([]map[string]interface{}, error) {
 		return nil, fmt.Errorf("Contentful APIからデータを取得中にエラーが発生しました（environmentID: %s）: %s\n", environmentID, err)
 	}
 
+	if resp.IsError() {
+		return nil, fmt.Errorf("Contentful APIからエラーレスポンスを受け取りました（environmentID: %s）: %s\n", environmentID, resp.Status())
+	}
+
 	// レスポンスのボディをJSONデコード
 	var data map[string]interface{}
 	if err := json.Unmarshal(resp.Body(), &data); err != nil {
@@ -98,8 +127,14 @@ func getData(environmentID string) ([]map[string]interface{}, error) {
 	}
 
 	// 必要な情報を取得して表示
-	sys := data["sys"].(map[string]interface{})
-	fields := data["fields"].(map[string]interface{})
+	sys, ok := data["sys"].(map[string]interface{})
+	if !ok {
+		return nil, fmt.Errorf("Contentful APIのレスポンスが予期せぬ形式です（environmentID: %s）", environmentID)
+	}
+	fields, ok := data["fields"].(map[string]interface{})
+	if !ok {
+		return nil, fmt.Errorf("Contentful APIのレスポンスが予期せぬ形式です（environmentID: %s）", environmentID)
+	}
 
 	fmt.Printf("取得したデータ（environmentID: %s）:\n", environmentID)
 	fmt.Println("ID:", sys["id"])
@@ -133,7 +168,7 @@ func storeDataInFirestore(data []map[string]interface{}) error {
 	bw := client.BulkWriter(ctx)
 
 	// 一括で書き込むコレクションの参照を取得
-	collectionRef := client.Collection("Breads")
+	collectionRef := client.Collection(BREADS_COLLECTION)
 
 	// ドキュメントを一括で書き込み
 	for _, item := range data {
